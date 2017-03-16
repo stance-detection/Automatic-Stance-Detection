@@ -81,10 +81,10 @@ if __name__ == "__main__":
         X_test = Xcs[fold]
         y_test = ys[fold]
 
-        #clf = GradientBoostingClassifier(n_estimators=200, random_state=14128, verbose=True)
+        clf = GradientBoostingClassifier(n_estimators=200, random_state=14128, verbose=True)
         #clf = GradientBoostingClassifier(n_estimators=50, random_state=14128, verbose=False)
         #del model
-        clf = LogisticRegression()
+        #clf = LogisticRegression()
         clf.fit(X_train, y_train)
         # Try random forest
         #clf.fit(X_train, y_train)
@@ -105,7 +105,7 @@ if __name__ == "__main__":
 
 
     #Run on Holdout set and report the final score on the holdout set
-    predicted = [LABELS[int(a)] for a in best_fold.predict(X_holdout)]
+    predicted = [LABELS[int(a)] for a in best_fold.predict(Xc_holdout)]
     actual = [LABELS[int(a)] for a in y_holdout]
 
     report_score(actual,predicted)
