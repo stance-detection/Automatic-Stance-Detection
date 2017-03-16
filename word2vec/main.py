@@ -3,6 +3,7 @@ import numpy as np
 
 from nltk.tokenize import RegexpTokenizer
 from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.linear_model import LogisticRegression
 from utils.dataset import DataSet
 from utils.generate_test_splits import kfold_split, get_stances_for_folds
 from utils.score import report_score, LABELS, score_submission
@@ -19,11 +20,11 @@ def cleantext(text):
 
 def buildWordVector(text, model):
     text = cleantext(text)
-    v = np.zeros(300).reshape((1,300))
+    v = np.zeros(300)
     count = 0
     for word in text:
         if word in model.vocab:
-            v = v + model[word].reshape((1,300))
+            v = v + model[word]
             count += 1
     if count!= 0:
         v /= count
@@ -68,6 +69,7 @@ if __name__ == "__main__":
     best_score = 0
     best_fold = None
 
+    del model
     print('training')
     for fold in fold_stances:
         ids = list(range(len(folds)))
@@ -79,10 +81,13 @@ if __name__ == "__main__":
         X_test = Xcs[fold]
         y_test = ys[fold]
 
-        clf = GradientBoostingClassifier(n_estimators=200, random_state=14128, verbose=True)
+        #clf = GradientBoostingClassifier(n_estimators=200, random_state=14128, verbose=True)
         #clf = GradientBoostingClassifier(n_estimators=50, random_state=14128, verbose=False)
-        # Try random forest
+        #del model
+        clf = LogisticRegression()
         clf.fit(X_train, y_train)
+        # Try random forest
+        #clf.fit(X_train, y_train)
 
         predicted = [LABELS[int(a)] for a in clf.predict(X_test)]
         actual = [LABELS[int(a)] for a in y_test]
