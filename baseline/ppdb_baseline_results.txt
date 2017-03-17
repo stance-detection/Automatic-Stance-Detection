@@ -1,0 +1,30 @@
+N=50, all else default			agree	disagree	discuss	unrelated
+Score: 3534.0 out of 4448.5	79.44%	agree	90	1	580	91
+		disagree	14	2	131	15
+		discuss	38	2	1555	205
+		unrelated	2	1	113	6782
+    
+All default			agree	disagree	discuss	unrelated
+Score: 3538.0 out of 4448.5	79.53%	agree	118	3	556	85
+		disagree	14	3	130	15
+		discuss	58	5	1527	210
+		unrelated	5	1	98	6794
+    
+N=200, Added headline-body word %			agree	disagree	discuss	unrelated
+Score: 3538.0 out of 4448.5	79.53%	agree	118	3	556	85
+		disagree	14	3	130	15
+		discuss	58	5	1527	210
+		unrelated	5	1	98	6794
+    
+Adding paraphrase co-occurences						
+N=50			agree	disagree	discuss	unrelated
+Score: 3623.0 out of 4448.5	81.44%	agree	90	1	614	57
+		disagree	13	3	130	16
+		discuss	46	1	1623	130
+		unrelated	0	0	75	6823
+    
+N=200			agree	disagree	discuss	unrelated
+Score: 3642.75 out of 4448.5	81.89%	agree	122	1	583	56
+		disagree	13	3	130	16
+		discuss	63	3	1615	119
+		unrelated	2	5	73	6818
