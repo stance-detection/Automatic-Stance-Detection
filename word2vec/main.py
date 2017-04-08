@@ -1,12 +1,16 @@
 import sys
 import numpy as np
 
-from nltk.tokenize import RegexpTokenizer
-from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
+from feature_engineering import refuting_features, polarity_features, hand_features, gen_or_load_feats
+from feature_engineering import word_overlap_features
 from utils.dataset import DataSet
 from utils.generate_test_splits import kfold_split, get_stances_for_folds
 from utils.score import report_score, LABELS, score_submission
+
+from nltk.tokenize import RegexpTokenizer
+from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+
 import gensim
 from gensim.models import word2vec
 from scipy.spatial.distance import cosine
@@ -31,8 +35,9 @@ def buildWordVector(text, model):
     
     return v
 
-def generate_features(stances, dataset, name, model, binary=True):
-    h, b, y = [], [], [] 
+def generate_baseline_features(stances, dataset, name, binary=True):
+    h, b, y = [],[],[]
+    baseline_dir = '../baseline/'
     for stance in stances:
         if (binary!=True):
             y.append(LABELS.index(stance['Stance']))
@@ -41,11 +46,38 @@ def generate_features(stances, dataset, name, model, binary=True):
                 y.append(0)
             else:
                 y.append(1)
-        h.append(buildWordVector(stance['Headline'],model))
-        b.append(buildWordVector(dataset.articles[stance['Body ID']], model))
-    c = np.c_[h,b]
 
-    return c, h, b, y
+        h.append(stance['Headline'])
+        b.append(dataset.articles[stance['Body ID']])
+
+    X_overlap = gen_or_load_feats(word_overlap_features, h, b, baseline_dir+ "features/overlap."+name+".npy")
+    X_refuting = gen_or_load_feats(refuting_features, h, b, baseline_dir+ "features/refuting."+name+".npy")
+    X_polarity = gen_or_load_feats(polarity_features, h, b, baseline_dir+ "features/polarity."+name+".npy")
+    X_hand = gen_or_load_feats(hand_features, h, b, baseline_dir+ "features/hand."+name+".npy")
+    X = np.c_[X_hand, X_polarity, X_refuting, X_overlap]
+    return X, y
+
+def generate_features(stances, dataset, name, model, binary=True):
+    headline, body, y = [], [], [] 
+    for stance in stances:
+        if (binary!=True):
+            y.append(LABELS.index(stance['Stance']))
+        else:
+            if LABELS.index(stance['Stance'])<3:
+                y.append(0)
+            else:
+                y.append(1)
+        headline.append(buildWordVector(stance['Headline'],model))
+        body.append(buildWordVector(dataset.articles[stance['Body ID']], model))
+    concatenated = np.c_[headline,body]
+
+    return concatenated, headline, body, y
+
+#def rel_unrel_classification():
+
+
+
+
 
 
 if __name__ == "__main__":
@@ -54,13 +86,15 @@ if __name__ == "__main__":
         sys.stderr.write('Please use Python version 3 and above\n')
         sys.exit(1)
 
-    print('Loading word2vec model')
-    model = gensim.models.KeyedVectors.load_word2vec_format('GoogleNews-vectors-negative300.bin', binary=True)
     print('Loading DataSet')
     d = DataSet()
     print('generating folds')
     folds,hold_out = kfold_split(d,n_folds=10)
     fold_stances, hold_out_stances = get_stances_for_folds(d,folds,hold_out)
+
+    print('Loading word2vec model')
+    model = gensim.models.KeyedVectors.load_word2vec_format('GoogleNews-vectors-negative300.bin', binary=True)
+
 
     Xhs = dict()
     Xbs = dict()
@@ -72,11 +106,39 @@ if __name__ == "__main__":
     Xcs_nb = dict()
     fold_stances_nb = dict()
     ys_true=dict()
+
+    X_baseline = dict()
+    y_baseline = dict()
+
+    #Xc_holdout : concatenated features of holdout set
+    #Xh_holdout : headline features of holdout set
+    #Xb_holdout : body features of holdout set
+    #y_holdout  : true labels of holdout set
+    #ys[fold]   : binary (related (0) vs unrelated (1)) labels for the stances in that fold
+    #ys_true[]  : true labels of the stances in that fold
+    #Xcs[fold]  : concatenated features of the stances in that fold
+    #Xhs[fold]  : headline features of the stances in that fold
+    #Xbs[fold]  : body features of the stances in that fold
+
+
     print('calculating features')
+    print('holdout set')
     Xc_holdout, Xh_holdout, Xb_holdout, y_holdout = generate_features(hold_out_stances,d,"holdout", model, binary=False)
+    X_baseline_holdout, _ = generate_baseline_features(hold_out_stances, d, "holdout", binary= False)
+
+
+    print('folds')
     for fold in fold_stances:
         Xcs[fold], Xhs[fold], Xbs[fold], ys[fold] = generate_features(fold_stances[fold],d,str(fold), model, binary=True)
         _,_,_,ys_true[fold] = generate_features(fold_stances[fold],d,str(fold),model, binary=False)
+        X_baseline[fold], _ = generate_baseline_features(fold_stances[fold], d, str(fold), binary = True)
+
+
+
+
+
+
+
 
     binary_flag=dict()
     binary_ind = dict()
@@ -85,6 +147,8 @@ if __name__ == "__main__":
         binary_ind[fold] = [i for i,e in enumerate(binary_flag[fold]) if e==0]
 
     #Xc_holdout_nb, Xh_holdout_nb, Xb_holdout_nb, y_holdout_nb = generate_features(hold_out_stances,d,"holdout",model,binary=False)
+    #_nb represents not binary (not just related vs unrelated), it considers the stances
+    #_nb[] lists are calculated only for those data which are related in the training set
     for fold in fold_stances:
         fold_stances_nb[fold] = [fold_stances[fold][x] for x in binary_ind[fold]]
         Xcs_nb[fold], Xhs_nb[fold], Xbs_nb[fold], ys_nb[fold] = generate_features(fold_stances_nb[fold],d,str(fold), model, binary=False)
@@ -95,20 +159,18 @@ if __name__ == "__main__":
     best_fold2= None
     del model
     print('training')
-    #GradientBoostingClassifier already done.
-    #RandomForest Classifier
+
     for fold in fold_stances:
         ids = list(range(len(folds)))
         del ids[fold]
 
-        X_train = np.vstack(tuple([Xcs[i] for i in ids]))
+        X_train = np.vstack(tuple([X_baseline[i] for i in ids]))
         y_train = np.hstack(tuple([ys[i] for i in ids]))
         
-        X_test = Xcs[fold]
+        X_test = X_baseline[fold]
         y_test = ys[fold]
         y_test_true = ys_true[fold]
-        #clf = GradientBoostingClassifier(n_estimators=200, random_state=14128, verbose=True)
-        #clf = GradientBoostingClassifier(n_estimators=50, random_state=14128, verbose=False)
+        
         #clf = LogisticRegression()
         clf = RandomForestClassifier(n_estimators=200, n_jobs=4, verbose = True)
         #clf = svm.SVC(kernel = 'rbf', gamma=0.5, C=1, verbose=True)
@@ -129,7 +191,7 @@ if __name__ == "__main__":
         init_pred_ind=dict()
         #fold_stances_new=dict()
             
-        init_pred[fold] = [int(a) for a in clf.predict(Xcs[fold])]
+        init_pred[fold] = [int(a) for a in clf.predict(X_baseline[fold])]
         init_pred_ind[fold] = [i for i,e in enumerate(init_pred[fold]) if e==0]
         
         Xcs_temp = [Xcs[fold][x] for x in init_pred_ind[fold]]
@@ -161,10 +223,10 @@ if __name__ == "__main__":
 
 
     #Run on Holdout set and report the final score on the holdout set
-    predicted = [LABELS[3] if a==1 else LABELS[0] for a in best_fold1.predict(Xc_holdout)]
+    predicted = [LABELS[3] if a==1 else LABELS[0] for a in best_fold1.predict(X_baseline_holdout)]
     test_pred = dict()
     test_pred_ind = dict()
-    test_pred = [int(a) for a in best_fold1.predict(Xc_holdout)]
+    test_pred = [int(a) for a in best_fold1.predict(X_baseline_holdout)]
     test_pred_ind = [i for i,e in enumerate(test_pred) if e==0]
     
     Xc_holdout_new = [Xc_holdout[x] for x in test_pred_ind]
