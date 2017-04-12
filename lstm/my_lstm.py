@@ -1,6 +1,7 @@
 import tensorflow as tf
 import tensorflow.contrib.layers as layers
 import numpy as np
+import sys
 from tensorflow.contrib.rnn import OutputProjectionWrapper
 
 class BatchSampler(object):
@@ -31,9 +32,6 @@ class LSTM(object):
         batch_size = 50
         TINY = 1e-6 # to avoid NaNs in logs
         
-        print('X_train shape: ' + X_train.shape())
-        print('y_train shape: ' + y_train.shape())
-            
         self.headline_input = tf.placeholder(tf.float32, [batch_size, None, feature_size]) #[batch_size, time, in}
         self.body_input = tf.placeholder(tf.float32, [batch_size, None, feature_size])
         self.gold = tf.placeholder(tf.float32, [batch_size, output_size])
@@ -47,9 +45,15 @@ class LSTM(object):
         #time-major means time is first dimension of input
         # inputs = tf.unstack(self.headline_input, axis=?)
         headline_outputs, headline_states = tf.nn.dynamic_rnn(headline_lstm, self.headline_input, initial_state=initial_state)
-        body_outputs, body_states = tf.nn.dynamic_rnn(OutputProjectionWrapper(body_lstm, output_size, activation=tf.nn.softmax), self.body_input, initial_state=headline_states[-1])
+        projection_wrapper = OutputProjectionWrapper(body_lstm, output_size)
+        #body_outputs, body_states = tf.nn.dynamic_rnn(projection_wrapper, self.body_input, initial_state=headline_states[-1])
+        old_state = headline_states[-1]
+        print(old_state.shape)
+
+        tf.nn.dynamic_rnn(projection_wrapper, self.body_input, initial_state=old_state)
+        sys.exit()
         
-        self.predicted_stance = body_outputs[-1]
+        self.predicted_stance = tf.nn.softmax(body_outputs[-1])
         error = -(self.gold * tf.log(self.predicted_stance + TINY) + (1.0 - self.gold) * tf.log(1.0 - self.predicted_stance + TINY))
         error = tf.reduce_mean(error)
         
