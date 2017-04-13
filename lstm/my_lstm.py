@@ -30,6 +30,7 @@ class LSTM(object):
         num_epochs = ''
         epoch_size = ''
         batch_size = 50
+        #batch_size = 1
         TINY = 1e-6 # to avoid NaNs in logs
         
         self.headline_input = tf.placeholder(tf.float32, [batch_size, None, feature_size]) #[batch_size, time, in}
@@ -47,7 +48,9 @@ class LSTM(object):
         headline_outputs, headline_states = tf.nn.dynamic_rnn(headline_lstm, self.headline_input, initial_state=initial_state)
         projection_wrapper = OutputProjectionWrapper(body_lstm, output_size)
         #body_outputs, body_states = tf.nn.dynamic_rnn(projection_wrapper, self.body_input, initial_state=headline_states[-1])
+        print(type(headline_states))
         old_state = headline_states[-1]
+        print(type(old_state))
         print(old_state.shape)
 
         tf.nn.dynamic_rnn(projection_wrapper, self.body_input, initial_state=old_state)

@@ -17,9 +17,10 @@ def generate_features(stances,dataset,name):
         b.append(dataset.articles[stance['Body ID']])
 
     X_embedding = gen_or_load_feats(word_features, h, b, "features/embedding."+name+".npy")
-    return X_embedding,y
-    #X = np.c_[X_embedding]
-    #return X,y
+    #return X_embedding,y
+    X = np.c_[X_embedding]
+    print(type(X[0][0]))
+    return X,y
 
 
 
@@ -38,9 +39,8 @@ if __name__ == "__main__":
 
     # Load/Precompute all features now
     X_holdout,y_holdout = generate_features(hold_out_stances,d,"holdout")
-    for fold in fold_stances:
+    for fold in fold_stances:  # iterates over keys
         Xs[fold],ys[fold] = generate_features(fold_stances[fold],d,str(fold))
-
 
     best_score = 0
     best_fold = None
@@ -54,6 +54,9 @@ if __name__ == "__main__":
         X_train = np.vstack(tuple([Xs[i] for i in ids]))
         y_train = np.hstack(tuple([ys[i] for i in ids]))
 
+        #print(X_train)
+        #print(type(X_train))
+        #print(X_train.shape)
         X_test = Xs[fold]
         y_test = ys[fold]
 
