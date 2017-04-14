@@ -24,6 +24,9 @@ def cleantext(text):
 
 def buildWordVector(text, model, mode):
 
+    #to concatenate word2vec and glove embeddeings, use np.hstack((a,b))
+    #but looking at the results of glove, this might not be helpful
+
     text = cleantext(text)
     if mode=='word2vec':
         v = np.zeros(300)
@@ -157,7 +160,7 @@ if __name__ == "__main__":
 
     mode_dict = ['word2vec','glove50','glove100','glove200','glove300']
 
-    for dic_ind in range(2,5):
+    for dic_ind in range(1):
         mode = mode_dict[dic_ind]    
         if mode == 'word2vec':
             model = gensim.models.KeyedVectors.load_word2vec_format('GoogleNews-vectors-negative300.bin', binary=True)
@@ -211,11 +214,6 @@ if __name__ == "__main__":
             Xcs[fold], Xhs[fold], Xbs[fold], ys[fold] = generate_features(fold_stances[fold],d,str(fold), model, mode, binary=True)
             _,_,_,ys_true[fold] = generate_features(fold_stances[fold],d,str(fold),model, mode, binary=False)
             X_baseline[fold], _ = generate_baseline_features(fold_stances[fold], d, str(fold), binary = True)
-
-
-
-
-
 
 
 
