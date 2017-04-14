@@ -171,8 +171,6 @@ if __name__ == "__main__":
     for fold in fold_stances:
         X_h[fold],X_b[fold], ys[fold] = generate_features(fold_stances[fold],d,str(fold), model, binary=False)
 
-
-
     best_score = 0
     best_fold1= None
     best_fold2= None
@@ -187,9 +185,7 @@ if __name__ == "__main__":
         X_btrain = [X_b[i]["features"][j] for i in ids for j in range(len(X_b[i]["features"]))]
         X_hlen = [X_h[i]["lengths"][j] for i in ids for j in range(len(X_h[i]["lengths"]))]
         X_blen = [X_b[i]["lengths"][j] for i in ids for j in range(len(X_b[i]["lengths"]))]
-
         y_train = np.hstack(tuple([ys[i] for i in ids]))
-        
         X_htest = X_h[fold]["features"]
         X_btest = X_b[fold]["features"]
         y_test = ys[fold]
@@ -199,65 +195,53 @@ if __name__ == "__main__":
         lstm = LSTM()
         predicted, cost, optimizer = lstm.calculate()
         
-
-
+        init = tf.global_variable_initializer()
+        
         with tf.Session() as sess:
             sess.run(init)
             epoch = 0
-            start_ind=0
-
-            while (epoch < lstm.epochs):
-                #indices = get_next_batch(len(X_htrain))                            
-            #reshape a list of lists as tensors and use dynamic padding
-            #fetch each batch
-                n_step=0
-                while n_step
-
-
-
-                batched_Xhead = tf.train.batch(
-                                tensors = X_htrain[start_ind: start_ind+ lstm.batch_size],
-                                batch_size = lstm.batch_size,
-                                dynamic_pad = True,
-                                allow_smaller_final_batch=True)
-
-                batched_Xbody = tf.train.batch(
-                                tensors = ,
-                                batch_size = lstm.batch_size,
-                                dynamic_pad = True,
-                                allow_smaller_final_batch=True)
-
-    
-                batched_Xhead_lengths = tf.train.batch(
-                                tensors = ,
-                                batch_size = lstm.batch_size,
-                                dynamic_pad = True,
-                                allow_smaller_final_batch=True)
-
-        
-                batched_Xbody_lengths = tf.train.batch(
-                                tensors = ,
-                                batch_size = lstm.batch_size,
-                                dynamic_pad = True,
-                                allow_smaller_final_batch=True)
-
-    
-                batched_ylabels = tf.train.batch(
-                                tensors = ,
-                                batch_size = lstm.batch_size,
-                                dynamic_pad = True,
-                                allow_smaller_final_batch=True)
             
+            while (epoch < lstm.epochs):
+                n_step=0
+                start_ind=0
+                while (n_step*lstm.batch_size < len(X_htrain)):
+                
+                    if (start_ind+lstm.batch_size < len(X_htrain)):
+                        Xhtrain_batch = X_htrain[start_ind: start_ind+ lstm.batch_size]
+                        Xhlen_batch = X_hlen[start_ind: start_ind+ lstm.batch_size]     
+                        max_hlen = max(Xhlen_batch)
+    
+                        Xbtrain_batch = X_btrain[start_ind: start_ind+ lstm.batch_size]
+                        Xblen_batch = X_blen[start_ind: start_ind+ lstm.batch_size]
+                        max_blen = max(Xblen_batch)
+                    else:
+                        #Xhtrain_batch = X_htrain[start_ind: ]
+                        #Xhlen_batch = X_hlen[start_ind: ]     
+                        #max_hlen = max(Xhlen_batch)
+    
+                        #Xbtrain_batch = X_btrain[start_ind: ]
+                        #Xblen_batch = X_blen[start_ind: ]
+                        #max_blen = max(Xblen_batch)
+                    
+
+                    XH = np.zeros([lstm.batch_size, max_hlen, lstm.input_dims], dtype=np.float64)
+                    XB = np.zeros([lstm.batch_size, max_blen, lstm.input_dims], dtype=np.float64)
+                    for hind, xh in enumerate(XH):
+                        xh[:Xhlen_batch[hind]] = Xhtrain_batch[hind]
+                    for bind, xb in enumerate(XB):
+                        xb[:Xblen_batch[bind]] = Xbtrain_batch[bind]
 
 
-                resut = tf.contrib.learn.run_n(
+
+
+                resut = sess.run(
                             {"optimizer": optimizer, "predicted": predicted, "cost":cost},
-                            feed_dict = {lstm.head = Xhead,lstm.body = Xbody,
-                                lstm.head_lengths = Xhead_lengths,
-                                lstm.body_lengths = Xbody_lengths,lstm.labels = ylabels})
+                            feed_dict = {lstm.head = XH,lstm.body = XB,
+                                lstm.head_lengths = X_hlen,
+                                lstm.body_lengths = X_blen,lstm.labels = ylabels})
                                         
 
-
+                start_ind += lstm.batch_size
 
 
 
@@ -265,7 +249,6 @@ if __name__ == "__main__":
 
 
         #clf = LogisticRegression()
-        clf = RandomForestClassifier(n_estimators=200, n_jobs=4, verbose = True)
         #clf = svm.SVC(kernel = 'rbf', gamma=0.5, C=1, verbose=True)
         clf.fit(X_train, y_train)
 
