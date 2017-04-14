@@ -16,7 +16,7 @@ from gensim.models import word2vec
 
 import tensorflow as tf
 from tensorflow.contrib import rnn
-
+from tensorflow.contrib.rnn import OutputProjectionWrapper
 
 
 def cleantext(text):
@@ -88,31 +88,45 @@ class LSTM():
         self.body_lengths = tf.placeholder(dtype=tf.int8,shape=[self.batch_size,])
         self.labels = tf.placeholder(dtype = tf.float64, shape=[self.batch_size, self.n_classes])
 
-        self.LSTM_head = tf.contrib.rnn.BasicLSTMCell(self.n_hidden)
-        self.LSTM_body = tf.contrib.rnn.BasicLSTMCell(self.n_hidden)
+        
+        with tf.variable_scope('head', reuse=True):
+            self.LSTM_head = tf.contrib.rnn.BasicLSTMCell(self.n_hidden, state_is_tuple=False)
+        with tf.variable_scope('body', reuse=True):
+            self.LSTM_body = tf.contrib.rnn.BasicLSTMCell(self.n_hidden, state_is_tuple=False)
 
         self.initial_state = self.LSTM_head.zero_state(self.batch_size, tf.float64)
+        self.outweights = {
+            # Hidden layer weights => 2*n_hidden because of foward + backward cells
+            'out': tf.Variable(tf.random_normal(dtype=tf.float64,[self.n_hidden, self.n_classes]))
+        }
+        self.biases = {
+            'out': tf.Variable(tf.random_normal(dtype=tf.float64,[self.n_classes]))
+        }
+
+
 
        
     def calculate(self):
-        head_outputs, head_last_states = tf.nn.dynamic_rnn(
+        with tf.variable_scope('head'):
+            head_outputs, head_last_states = tf.nn.dynamic_rnn(
                                 cell = self.LSTM_head,
                                 dtype = tf.float64,
                                 sequence_length = self.head_lengths,
                                 inputs = self.head,
                                 initial_state = self.initial_state)
 
-        head_old_layer = head_last_states[-1]
+        head_old_layer = head_last_states
         
-        body_outputs, body_last_states = tf.nn.dynamic_rnn(
+        with tf.variable_scope('body'):
+            body_outputs, body_last_states = tf.nn.dynamic_rnn(
                                 cell = self.LSTM_body,
                                 dtype = tf.float64,
                                 sequence_length = self.body_lengths,
                                 inputs = self.body,
                                 initial_state = head_old_layer)
         
-
-        body_out_layer = OutputProjectionLayer(self.LSTM_body, self.n_classes)
+        body_out_layer = tf.matmul(body_outputs[:,-1,:], self.outweights['out']) + self.biases['out']
+        #body_out_layer = OutputProjectionWrapper(self.LSTM_body, self.n_classes)
         predicted = tf.nn.softmax(body_out_layer)
         cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=predicted, labels=lstm.labels))
         optimizer = tf.train.AdamOptimizer(learning_rate=lstm.learning_rate).minimize(cost)
