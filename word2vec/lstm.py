@@ -7,7 +7,7 @@ from utils.dataset import DataSet
 from utils.generate_test_splits import kfold_split, get_stances_for_folds
 from utils.score import report_score, LABELS, score_submission
 
-#from nltk.tokenize import RegexpTokenizer
+from nltk.tokenize import RegexpTokenizer
 #from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
 #from sklearn.linear_model import LogisticRegression
 
@@ -82,23 +82,23 @@ class LSTM():
         self.n_classes = 4 
 
         # tf Graph input
-        self.head = tf.placeholder(dtype = tf.float64, [self.batch_size, None, self.input_dims])
-        self.body = tf.placeholder(dtype = tf.float64, [self.batch_size, None, self.input_dims])
-        self.head_lengths = tf.placeholder([self.batch_size,])
-        self.body_lengths = tf.placeholder([self.batch_size,])
-        self.labels = tf.placeholder(dtype = tf.float64, [self.batch_size, n_classes])
+        self.head = tf.placeholder(dtype = tf.float64, shape=[self.batch_size, None, self.input_dims])
+        self.body = tf.placeholder(dtype = tf.float64, shape=[self.batch_size, None, self.input_dims])
+        self.head_lengths = tf.placeholder(dtype=tf.int8,shape=[self.batch_size,])
+        self.body_lengths = tf.placeholder(dtype=tf.int8,shape=[self.batch_size,])
+        self.labels = tf.placeholder(dtype = tf.float64, shape=[self.batch_size, self.n_classes])
 
-        self.LSTM_head = tf.contrib.rnn.BasicLSTM(self.n_hidden)
-        self.LSTM_body = tf.contrib.rnn.BasicLSTM(self.n_hidden)
+        self.LSTM_head = tf.contrib.rnn.BasicLSTMCell(self.n_hidden)
+        self.LSTM_body = tf.contrib.rnn.BasicLSTMCell(self.n_hidden)
 
-        self.initial_state = LSTM_head.zero_state(self.batch_size, tf.float32)
+        self.initial_state = self.LSTM_head.zero_state(self.batch_size, tf.float64)
 
        
     def calculate(self):
         head_outputs, head_last_states = tf.nn.dynamic_rnn(
                                 cell = self.LSTM_head,
                                 dtype = tf.float64,
-                                sequence_lengths = self.head_lengths,
+                                sequence_length = self.head_lengths,
                                 inputs = self.head,
                                 initial_state = self.initial_state)
 
@@ -107,7 +107,7 @@ class LSTM():
         body_outputs, body_last_states = tf.nn.dynamic_rnn(
                                 cell = self.LSTM_body,
                                 dtype = tf.float64,
-                                sequence_lengths = self.body_lengths,
+                                sequence_length = self.body_lengths,
                                 inputs = self.body,
                                 initial_state = head_old_layer)
         
