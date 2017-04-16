@@ -19,6 +19,8 @@ def generate_features(stances,dataset,name):
 
     X_overlap = gen_or_load_feats(word_overlap_features, h, b, "features/overlap."+name+".npy")
     X_refuting = gen_or_load_feats(refuting_features, h, b, "features/refuting."+name+".npy")
+    X_refuting = gen_or_load_feats(refuting_features, h, b, "features/agreeing."+name+".npy")
+    X_refuting = gen_or_load_feats(refuting_features, h, b, "features/discussing."+name+".npy")
     X_polarity = gen_or_load_feats(polarity_features, h, b, "features/polarity."+name+".npy")
     X_hand = gen_or_load_feats(hand_features, h, b, "features/hand."+name+".npy")
 

@@ -11,6 +11,81 @@ _wnl = nltk.WordNetLemmatizer()
 p_lex = Paraphrases("lexical")
 p_many = Paraphrases("one_to_many")
 
+refuting_words = [
+        'fake',
+        'fraud',
+        'hoax',
+        'false',
+        'deny', 'denies',
+        # 'refute',
+        'not',
+        'despite',
+        'nope',
+        'doubt', 'doubts',
+        'bogus',
+        'debunk',
+        'pranks',
+        'retract',
+        'notwithstanding',
+        'although'
+        'incorrect',
+        'wrong',
+        'lie',
+        'fabricate',
+        'unsupported',
+        'untrue',
+        'refute',
+        'rebut',
+        'disprove',
+        'contradict',
+        'falsify',
+        'deceive',
+        'invalid'
+]
+
+refuting_phrases = [
+        'not true',
+        'wrong on both counts'
+        'actually incorrect',
+        'materially false',
+        'false representation',
+        'failing to',
+        'no longer',
+        'simply not',
+        'in spite',
+        'have doubts',
+        'some doubts',
+        'certain doubts',
+        'question marks'
+]
+
+agreeing_words = [
+	'agree', 
+        'true', 
+        'valid', 
+        'prove', 
+        'demonstrate', 
+        'confirm', 
+        'corroborate', 
+        'substantiate', 
+        'support', 
+        'validate', 
+        'concur', 
+        'correspond', 
+        'legitimate', 
+        'reasonable'
+]
+
+discussing_words = [
+	'ambiguous', 
+        'equivocal', 
+        'indeterminate', 
+        'uncertain', 
+        'neutral', 
+        'impartial', 
+        'debatable', 
+        'unclear'
+]
 
 def normalize_word(w):
     return _wnl.lemmatize(w).lower()
@@ -22,7 +97,6 @@ def get_tokenized_lemmas(s):
 
 def clean(s):
     # Cleans a string: Lowercasing, trimming, removing non-alphanumeric
-
     return " ".join(re.findall(r'\w+', s, flags=re.UNICODE)).lower()
 
 
@@ -40,7 +114,6 @@ def gen_or_load_feats(feat_fn, headlines, bodies, feature_file):
 
 
 
-
 def word_overlap_features(headlines, bodies):
     X = []
     for i, (headline, body) in tqdm(enumerate(zip(headlines, bodies))):
@@ -54,7 +127,39 @@ def word_overlap_features(headlines, bodies):
     return X
 
 
+
 def refuting_features(headlines, bodies):
+    X = []
+    for i, (headline, body) in tqdm(enumerate(zip(headlines, bodies))):
+        clean_headline = clean(headline)
+        clean_headline_tokens = get_tokenized_lemmas(clean_headline)
+        features = [1 if word in clean_headline_tokens else 0 for word in refuting_words]
+        features.extend([1 if phrase in clean_headline else 0 for phrase in refuting_phrases])
+        X.append(features)
+    return X
+
+
+def agreeing_features(headlines, bodies):
+    X = []
+    for i, (headline, body) in tqdm(enumerate(zip(headlines, bodies))):
+        clean_headline = clean(headline)
+        clean_headline = get_tokenized_lemmas(clean_headline)
+        features = [1 if word in clean_headline else 0 for word in agreeing_words]
+        X.append(features)
+    return X
+
+
+def discussing_features(headlines, bodies):
+    X = []
+    for i, (headline, body) in tqdm(enumerate(zip(headlines, bodies))):
+        clean_headline = clean(headline)
+        clean_headline = get_tokenized_lemmas(clean_headline)
+        features = [1 if word in clean_headline else 0 for word in discussing_words]
+        X.append(features)
+    return X
+
+
+def polarity_features(headlines, bodies):
     _refuting_words = [
         'fake',
         'fraud',
@@ -71,35 +176,12 @@ def refuting_features(headlines, bodies):
         'pranks',
         'retract'
     ]
-    X = []
-    for i, (headline, body) in tqdm(enumerate(zip(headlines, bodies))):
-        clean_headline = clean(headline)
-        clean_headline = get_tokenized_lemmas(clean_headline)
-        features = [1 if word in clean_headline else 0 for word in _refuting_words]
-        X.append(features)
-    return X
 
-
-def polarity_features(headlines, bodies):
-    _refuting_words = [
-        'fake',
-        'fraud',
-        'hoax',
-        'false',
-        'deny', 'denies',
-        'not',
-        'despite',
-        'nope',
-        'doubt', 'doubts',
-        'bogus',
-        'debunk',
-        'pranks',
-        'retract'
-    ]
 
     def calculate_polarity(text):
         tokens = get_tokenized_lemmas(text)
         return sum([t in _refuting_words for t in tokens]) % 2
+
     X = []
     for i, (headline, body) in tqdm(enumerate(zip(headlines, bodies))):
         clean_headline = clean(headline)
