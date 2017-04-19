@@ -39,7 +39,7 @@ def cleantext(text):
 
     return tokens
 
-def buildWordVector(text, model, mode):
+def buildWordVector(text, model, mode, vocab, tfidf, flag=1):
 
     #to concatenate word2vec and glove embeddeings, use np.hstack((a,b))
     #but looking at the results of glove, this might not be helpful
@@ -47,13 +47,16 @@ def buildWordVector(text, model, mode):
     #vocab = vector.vocabulary_
     #print(len(vocab))
     text = cleantext(text)
+    wei = 0.0
     if mode=='word2vec':
         v = np.zeros(300)
         count = 0
         for word in text:
             if word in model.vocab:
-                v = v + model[word]
-                count += 1
+                if word in vocab:
+                    v = v + tfidf[flag,vocab[word]]*model[word]
+                    wei += tfidf[flag, vocab[word]]
+                    count += 1
         if count!= 0:
             v /= count
    
@@ -107,8 +110,21 @@ def generate_features(stances, dataset, name, model, mode, binary=True):
             else:
                 y.append(1)
 
-        headline.append(buildWordVector(stance["Headline"],model, mode))
-        body.append(buildWordVector(dataset.articles[stance["Body ID"]], model, mode))
+        d = []
+        d.append(' '.join(cleantext(stance["Headline"])))
+        d.append(' '.join(cleantext(dataset.articles[stance["Body ID"]])))
+        #print(d)
+
+        vector = TfidfVectorizer(min_df=1, tokenizer=None)
+        tfidf = vector.fit_transform(d)
+        vocab = vector.vocabulary_
+        #print(len(vocab))
+        #clean_headline = clean(stance['Headline'])
+        #clean_body = clean(dataset.articles[stance['Body ID']])
+        #tokenized_headline = get_tokenized_lemmas(clean_headline)
+        #tokenized_body = get_tokenized_lemmas(clean_body)
+        headline.append(buildWordVector(stance["Headline"],model, mode, vocab, tfidf, flag=1))
+        body.append(buildWordVector(dataset.articles[stance["Body ID"]], model, mode, vocab, tfidf, flag=0))
     concatenated = np.c_[headline,body]
 
 
@@ -199,17 +215,15 @@ if __name__ == "__main__":
         print('holdout set')
         Xc_holdout, Xh_holdout, Xb_holdout, y_holdout = generate_features(hold_out_stances,d,"holdout", model, mode, binary=False)
         X_baseline_holdout, _ = generate_baseline_features(hold_out_stances, d, "holdout", binary= False)
-        Xtotal_holdout = np.hstack((X_baseline_holdout, Xc_holdout))
 
 
-        Xtotal = dict()
         print('folds')
         for fold in fold_stances:
             print("fold=",fold)
             Xcs[fold], Xhs[fold], Xbs[fold], ys[fold] = generate_features(fold_stances[fold],d,str(fold), model, mode, binary=True)
             _,_,_,ys_true[fold] = generate_features(fold_stances[fold],d,str(fold),model, mode, binary=False)
             X_baseline[fold], _ = generate_baseline_features(fold_stances[fold], d, str(fold), binary = True)
-            Xtotal[fold] = np.hstack((X_baseline[fold], Xcs[fold]))
+
 
 
         binary_flag=dict()
@@ -221,17 +235,10 @@ if __name__ == "__main__":
         #Xc_holdout_nb, Xh_holdout_nb, Xb_holdout_nb, y_holdout_nb = generate_features(hold_out_stances,d,"holdout",model,binary=False)
         #_nb represents not binary (not just related vs unrelated), it considers the stances
         #_nb[] lists are calculated only for those data which are related in the training set
-        Xbasenb = dict()
-        Xtotalnb=dict()
         for fold in fold_stances:
             fold_stances_nb[fold] = [fold_stances[fold][x] for x in binary_ind[fold]]
-            #_,_,_, ys_nb[fold] = generate_features(fold_stances_nb[fold],d,str(fold), model, mode, binary=False)
-            #Xbasenb[fold],_ = generate_baseline_features(fold_stances_nb[fold],d, str(fold), binary=False)    
-            #Xtotalnb = np.hstack((Xbasenb[fold], Xcs_nb[fold]))
-            ys_nb[fold] = [ys_true[fold][bind] for bind in binary_ind[fold]]
-            Xcs_nb[fold] = Xcs[fold][binary_ind[fold][:],:]
-            Xbasenb[fold] = X_baseline[fold][binary_ind[fold][:],:]
-            Xtotalnb[fold] = np.hstack((Xbasenb[fold], Xcs_nb[fold]))
+            Xcs_nb[fold], Xhs_nb[fold], Xbs_nb[fold], ys_nb[fold] = generate_features(fold_stances_nb[fold],d,str(fold), model, mode, binary=False)
+
 
         best_score = 0
         best_fold1= None
@@ -248,16 +255,11 @@ if __name__ == "__main__":
                     ids = list(range(len(folds)))
                     del ids[fold]
 
-                    #X_train = np.vstack(tuple([X_baseline[i] for i in ids]))
-                    #y_train = np.hstack(tuple([ys[i] for i in ids]))
-                    
-                    X_train = np.vstack(tuple([Xtotal[i] for i in ids]))
+                    X_train = np.vstack(tuple([X_baseline[i] for i in ids]))
                     y_train = np.hstack(tuple([ys[i] for i in ids]))
-                    X_test = Xtotal[fold]
-                    y_test = ys[fold]
                     
-                    #X_test = X_baseline[fold]
-                    #y_test = ys[fold]
+                    X_test = X_baseline[fold]
+                    y_test = ys[fold]
                     y_test_true = ys_true[fold]
                     
                     #clf = LogisticRegression()
@@ -267,10 +269,8 @@ if __name__ == "__main__":
 
 
                     X_train_nb = np.vstack(tuple([Xcs_nb[i] for i in ids]))
-                    #y_train_nb = np.hstack(tuple([ys_nb[i] for i in ids]))
-             
-                    #X_train_nb = np.vstack(tuple([Xtotalnb[i] for i in ids]))
                     y_train_nb = np.hstack(tuple([ys_nb[i] for i in ids]))
+             
                     clf2 = RandomForestClassifier(n_estimators=200*pmtune2,n_jobs=4,verbose=False)
                     clf2.fit(X_train_nb,y_train_nb)                            
                             
@@ -282,12 +282,10 @@ if __name__ == "__main__":
                     init_pred_ind=dict()
                     #fold_stances_new=dict()
                         
-                    #init_pred[fold] = [int(a) for a in clf.predict(X_baseline[fold])]
-                    init_pred[fold] = [int(a) for a in clf.predict(Xtotal[fold])]
+                    init_pred[fold] = [int(a) for a in clf.predict(X_baseline[fold])]
                     init_pred_ind[fold] = [i for i,e in enumerate(init_pred[fold]) if e==0]
                     
                     Xcs_temp = [Xcs[fold][x] for x in init_pred_ind[fold]]
-                    #Xcs_temp = [Xtotal[fold][x] for x in init_pred_ind[fold]]
                     predicted_new = [LABELS[int(a)] for a in clf2.predict(Xcs_temp)]
                     final = predicted
                     for i,e in enumerate(init_pred_ind[fold]):
@@ -316,16 +314,13 @@ if __name__ == "__main__":
 
 
                 #Run on Holdout set and report the final score on the holdout set
-                #predicted = [LABELS[3] if a==1 else LABELS[0] for a in best_fold1.predict(X_baseline_holdout)]
-                predicted = [LABELS[3] if a==1 else LABELS[0] for a in best_fold1.predict(Xtotal_holdout)]
+                predicted = [LABELS[3] if a==1 else LABELS[0] for a in best_fold1.predict(X_baseline_holdout)]
                 test_pred = dict()
                 test_pred_ind = dict()
-                #test_pred = [int(a) for a in best_fold1.predict(X_baseline_holdout)]
-                test_pred = [int(a) for a in best_fold1.predict(Xtotal_holdout)]
+                test_pred = [int(a) for a in best_fold1.predict(X_baseline_holdout)]
                 test_pred_ind = [i for i,e in enumerate(test_pred) if e==0]
                 
                 Xc_holdout_new = [Xc_holdout[x] for x in test_pred_ind]
-                #Xc_holdout_new = [Xtotal_holdout[x] for x in test_pred_ind]
                 test_pred_new = [LABELS[int(a)] for a in best_fold2.predict(Xc_holdout_new)]
                 final = predicted
                 for i,e in enumerate(test_pred_ind):

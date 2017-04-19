@@ -1,5 +1,6 @@
 import sys
 import numpy as np
+import pickle
 
 from feature_engineering import refuting_features, polarity_features, hand_features, gen_or_load_feats
 from feature_engineering import word_overlap_features
@@ -205,7 +206,7 @@ if __name__ == "__main__":
     fold_stances, hold_out_stances = get_stances_for_folds(d,folds,hold_out)
 
     print('Loading word2vec model')
-    model = gensim.models.KeyedVectors.load_word2vec_format('GoogleNews-vectors-negative300.bin', binary=True)
+    #model = gensim.models.KeyedVectors.load_word2vec_format('GoogleNews-vectors-negative300.bin', binary=True)
 
     mode_dict = ['word2vec','glove50','glove100','glove200','glove300']
 
@@ -229,21 +230,59 @@ if __name__ == "__main__":
 
 
 
-    ys = dict()
+    #ys = dict()
+    #X_h = dict()
+    #X_b = dict()
+
     X_h = dict()
     X_b = dict()
+    ys = dict()
+    ys_true = dict()
+    Xcs = dict()
+    X_h_nb = dict()
+    X_b_nb = dict()
+    ys_nb = dict()
+#    Xcs_nb = dict()
+    fold_stances_nb = dict()
+    ys_true=dict()
+
+    X_baseline = dict()
+    y_baseline = dict()
+
 
 
 
     print('calculating features')
     print('holdout set')
     X_h_holdout, X_b_holdout, y_holdout = generate_features(hold_out_stances,d,"holdout", model, mode, binary=False)
+    X_baseline_holdout, _ = generate_baseline_features(hold_out_stances, d, "holdout",binary=False)
+
 
     #fold_stances = fold_stances
     print('folds')
     for fold in fold_stances:
         if fold<10:
-            X_h[fold],X_b[fold], ys[fold] = generate_features(fold_stances[fold],d,str(fold), model, mode, binary=False)
+            X_h[fold],X_b[fold], ys[fold] = generate_features(fold_stances[fold],d,str(fold), model, mode, binary=True)
+            _,_,ys_true[fold] = generate_features(fold_stances[fold], d, str(fold), model, mode, binary=False)
+            X_baseline[fold], _ = generate_baseline_features(fold_stances[fold], d, str(fold), binary = True)
+
+
+    binary_flag=dict()
+    binary_ind = dict()
+    for fold in fold_stances:
+        binary_flag[fold] = [1 if x['Stance']=='unrelated' else 0 for x in fold_stances[fold]]
+        binary_ind[fold] = [i for i,e in enumerate(binary_flag[fold]) if e==0]
+
+
+    for fold in fold_stances:
+        fold_stances_nb[fold] = [fold_stances[fold][x] for x in binary_ind[fold]]
+        X_h_nb[fold], X_b_nb[fold], ys_nb[fold] = generate_features(fold_stances_nb[fold],d,str(fold), model, mode, binary=False)
+
+
+
+
+
+
 
     best_score = 0
     best_fold1= None
@@ -251,16 +290,16 @@ if __name__ == "__main__":
     del model
     print('training')
 
-    learning_rate = 0.001
-    training_iters = 100000
+    lr = 0.0005
+    #training_iters = 100000
     batch_size = 128
     display_step = 10
-    epochs = 50
+    ep = 50
+    n_hidden = 100 # hidden layer num of features
 
     # Network Parameters
     n_input = 300 # MNIST data input (img shape: 28*28)
     n_steps = 2 # timesteps
-    n_hidden = 128 # hidden layer num of features
     n_classes = 4 # MNIST total classes (0-9 digits)
 
     # tf Graph input
@@ -278,73 +317,139 @@ if __name__ == "__main__":
     pred = RNN(x, weights, biases)
 
     # Define loss and optimizer
-    cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=pred, labels=labels))
-    optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cost)
-
-    # Evaluate model
-    correct_pred = tf.equal(tf.argmax(pred,1), tf.argmax(labels,1))
-    accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
-
-    # Initializing the variables
-    init = tf.global_variables_initializer()
 
     #for fold in fold_stances:
-    for fold in range(10):
-        ids = list(range(len(folds)))
-        del ids[fold]
+    tune_score = np.zeros((4,4,10))
+    for l_tune in range(1,2):
+        for lr_tune in range(1,5):
+            learning_rate = lr*lr_tune
+            #n_hidden = nh*l_tune
+            epochs = ep*l_tune
+            print("epochs : ", epochs, "learning_rate : ", learning_rate)
 
-        X_htrain = [X_h[i]["features"][j] for i in ids for j in range(len(X_h[i]["features"]))]
-        X_btrain = [X_b[i]["features"][j] for i in ids for j in range(len(X_b[i]["features"]))]
-        y_train = np.hstack(tuple([ys[i] for i in ids]))
-        X_htest = X_h[fold]["features"]
-        X_btest = X_b[fold]["features"]
-        y_test = ys[fold]
-        
-        
-        with tf.Session() as sess:
-            sess.run(init)
-            epoch = 0
-            
-            while (epoch < epochs):
-                n_step=0
-                print( "epoch: ", epoch)
-                start_ind=0
-                while (n_step*batch_size < len(X_htrain)):
+            cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=pred, labels=labels))
+            optimizer = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cost)
+
+            # Evaluate model
+            correct_pred = tf.equal(tf.argmax(pred,1), tf.argmax(labels,1))
+            accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
+
+            # Initializing the variables
+            init = tf.global_variables_initializer()
+
+            for fold in range(10):
+                ids = list(range(len(folds)))
+                del ids[fold]
+
+                Xbase_train = np.vstack(tuple([X_baseline[i] for i in ids]))
+                ybase_train = np.hstack(tuple([ys[i] for i in ids]))
+                Xbase_test = X_baseline[fold]
+                ybase_test = ys[fold]
+                clf = RandomForestClassifier(n_estimators=200, n_jobs=4, verbose=False)
+                clf.fit(Xbase_train, ybase_train)
+
+                X_htrain = [X_h_nb[i]["features"][j] for i in ids for j in range(len(X_h_nb[i]["features"]))]
+                X_btrain = [X_b_nb[i]["features"][j] for i in ids for j in range(len(X_b_nb[i]["features"]))]
+                y_train = np.hstack(tuple([ys_nb[i] for i in ids]))
+                X_htest = X_h[fold]["features"]
+                X_btest = X_b[fold]["features"]
+                y_test = ys[fold]
                 
-                    if (start_ind+batch_size < len(X_htrain)):
-                        Xhtrain_batch = X_htrain[start_ind: start_ind+ batch_size]
-                        y_tr_batch = to_one_hot(y_train[start_ind: start_ind+ batch_size])
-                        Xbtrain_batch = X_btrain[start_ind: start_ind+ batch_size]
+                with tf.Session() as sess:
+                    sess.run(init)
+                    epoch = 0
                     
+                    while (epoch < epochs):
+                        n_step=0
+                        
+                        #if epoch%10==0:
+                        #    print( "epoch: ", epoch)
+                        start_ind=0
+                        while (n_step*batch_size < len(X_htrain)):
+                        
+                            if (start_ind+batch_size < len(X_htrain)):
+                                Xhtrain_batch = X_htrain[start_ind: start_ind+ batch_size]
+                                y_tr_batch = to_one_hot(y_train[start_ind: start_ind+ batch_size])
+                                Xbtrain_batch = X_btrain[start_ind: start_ind+ batch_size]
+                            
 
-                    train = np.zeros((batch_size, n_steps, n_input))
-                    for batch_ind in range(batch_size):
-                        train[batch_ind, 0, :] = Xhtrain_batch[batch_ind]
-                        train[batch_ind, 1, :] = Xbtrain_batch[batch_ind]
-
-
-
-                    result = sess.run(
-                            {"optimizer": optimizer, "predicted": pred, "cost":cost},
-                            feed_dict = {x: train,labels: y_tr_batch})
-                    if n_step % display_step == 0:
-                        predic = sess.run(pred, feed_dict={x: train, labels: y_tr_batch})
-                
-                        predic_lab = [LABELS[int(a)] for a in from_one_hot(predic)]
-                        actual = [LABELS[int(a)] for a in np.argmax(y_tr_batch,1)]
-
-                    start_ind += batch_size
-                    n_step += 1
-                epoch += 1
-            test = np.zeros((len(X_htest),n_steps, n_input))
-            for test_ind in range(len(X_htest)):
-                test[test_ind, 0, :] = X_htest[test_ind]
-                test[test_ind, 0, :] = X_btest[test_ind]
+                            train = np.zeros((batch_size, n_steps, n_input))
+                            for batch_ind in range(batch_size):
+                                train[batch_ind, 0, :] = Xhtrain_batch[batch_ind]
+                                train[batch_ind, 1, :] = Xbtrain_batch[batch_ind]
 
 
-            predic = sess.run(pred, feed_dict={x: test, labels: to_one_hot(y_test)})
-            predic_lab = [LABELS[int(a)] for a in from_one_hot(predic)]
-            actual = [LABELS[int(a)] for a in np.argmax(to_one_hot(y_test),1)]
-            print('confusion matrix')
-            report_score(actual, predic_lab)
 
+                            result = sess.run(
+                                    {"optimizer": optimizer, "predicted": pred, "cost":cost},
+                                    feed_dict = {x: train,labels: y_tr_batch})
+                            if n_step % display_step == 0:
+                                predic = sess.run(pred, feed_dict={x: train, labels: y_tr_batch})
+                        
+                                predic_lab = [LABELS[int(a)] for a in from_one_hot(predic)]
+                                actual = [LABELS[int(a)] for a in np.argmax(y_tr_batch,1)]
+
+                            start_ind += batch_size
+                            n_step += 1
+                        epoch += 1
+
+                    base_pred = [LABELS[3] if a==1 else LABELS[0] for a in clf.predict(Xbase_test)]
+                    base_act = [LABELS[int(a)] for a in ys_true[fold]]
+                    init_pred = dict()
+                    init_pred_ind = dict()
+                    init_pred[fold] = [int(a) for a in clf.predict(X_baseline[fold])]
+                    init_pred_ind[fold] = [i for i,e in enumerate(init_pred[fold]) if e==0]
+
+                    test = np.zeros((len(init_pred_ind[fold]),n_steps, n_input))
+                    cc=0
+                    for test_ind in init_pred_ind[fold]:
+                        test[cc, 0, :] = X_htest[test_ind]
+                        test[cc, 0, :] = X_btest[test_ind]
+                        cc+=1
+                    predic = sess.run(pred, feed_dict={x: test, labels: to_one_hot(y_test)})
+                    predic_lab = [LABELS[int(a)] for a in from_one_hot(predic)]
+                    actual = [LABELS[int(a)] for a in np.argmax(to_one_hot(y_test),1)]
+                    for i, e in enumerate(init_pred_ind[fold]):
+                        base_pred[e] = predic_lab[i]
+                    print('confusion matrix')
+                    #report_score(base_act, base_pred)
+                    
+                    fold_score, _ = score_submission(base_act, base_pred)
+                    max_fold_score, _ = score_submission(base_act, base_act)
+                    score = fold_score/max_fold_score
+                    print(fold," : ", score)
+                    if score>best_score:
+                        best_score = score
+                        best_fold1 = clf
+
+
+
+                    base_pred = [LABELS[3] if a==1 else LABELS[0] for a in clf.predict(X_baseline_holdout)]
+                    base_act = [LABELS[int(a)] for a in y_holdout]
+                    init_pred = dict()
+                    init_pred_ind = dict()
+                    init_pred = [int(a) for a in clf.predict(X_baseline_holdout)]
+                    init_pred_ind = [i for i,e in enumerate(init_pred) if e==0]
+
+                    test = np.zeros((len(init_pred_ind),n_steps, n_input))
+                    cc=0
+                    for test_ind in init_pred_ind:
+                        test[cc, 0, :] = X_h_holdout["features"][test_ind]
+                        test[cc, 0, :] = X_b_holdout["features"][test_ind]
+                        cc+=1
+                    predic = sess.run(pred, feed_dict={x: test, labels: to_one_hot(y_test)})
+                    predic_lab = [LABELS[int(a)] for a in from_one_hot(predic)]
+                    #actual = [LABELS[int(a)] for a in np.argmax(to_one_hot(y_test),1)]
+                    for i, e in enumerate(init_pred_ind):
+                        base_pred[e] = predic_lab[i]
+                    print('confusion matrix')
+                    report_score(base_act, base_pred)
+                    
+                    fold_score, _ = score_submission(base_act, base_pred)
+                    max_fold_score, _ = score_submission(base_act, base_act)
+                    score = fold_score/max_fold_score
+                    tune_score[l_tune, lr_tune, fold] = score
+
+
+    print(np.amax(tune_score, axis=2))
+    pickle.dump(tune_score, open("finetuning.p","wb"))    
