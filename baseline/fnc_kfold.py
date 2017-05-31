@@ -4,9 +4,10 @@ import numpy as np
 from sklearn.ensemble import GradientBoostingClassifier
 from feature_engineering import refuting_features, polarity_features, hand_features, gen_or_load_feats
 from feature_engineering import word_overlap_features
-from utils.dataset import DataSet
+from utils.dataset import DataSet, TestDataSet
 from utils.generate_test_splits import kfold_split, get_stances_for_folds
 from utils.score import report_score, LABELS, score_submission
+from utils.submission_writer import write_submission
 
 
 def generate_features(stances,dataset,name):
@@ -25,6 +26,21 @@ def generate_features(stances,dataset,name):
     X = np.c_[X_hand, X_polarity, X_refuting, X_overlap]
     return X,y
 
+def generate_test_features(stances,dataset,name):
+    h, b, = [],[]
+
+    for stance in stances:
+        h.append(stance['Headline'])
+        b.append(dataset.articles[stance['Body ID']])
+
+    X_overlap = gen_or_load_feats(word_overlap_features, h, b, "features/overlap."+name+".npy")
+    X_refuting = gen_or_load_feats(refuting_features, h, b, "features/refuting."+name+".npy")
+    X_polarity = gen_or_load_feats(polarity_features, h, b, "features/polarity."+name+".npy")
+    X_hand = gen_or_load_feats(hand_features, h, b, "features/hand."+name+".npy")
+
+    X = np.c_[X_hand, X_polarity, X_refuting, X_overlap]
+    return X
+
 
 
 
@@ -35,15 +51,24 @@ if __name__ == "__main__":
         sys.stderr.write('Please use Python version 3 and above\n')
         sys.exit(1)
 
+    test_mode = True
+
     d = DataSet()
     folds,hold_out = kfold_split(d,n_folds=10)
     fold_stances, hold_out_stances = get_stances_for_folds(d,folds,hold_out)
+
+    if test_mode:
+        test_d = TestDataSet()
+        test_stances = test_d.stances
 
     Xs = dict()
     ys = dict()
 
     # Load/Precompute all features now
-    X_holdout,y_holdout = generate_features(hold_out_stances,d,"holdout")
+    if test_mode:
+        X_test = generate_test_features(test_stances,test_d,"holdout")
+    else:
+        X_holdout,y_holdout = generate_features(hold_out_stances,d,"holdout")
     for fold in fold_stances:
         Xs[fold],ys[fold] = generate_features(fold_stances[fold],d,str(fold))
 
@@ -82,9 +107,12 @@ if __name__ == "__main__":
             best_fold = clf
 
 
+    if test_mode:
+        predicted = [LABELS[int(a)] for a in best_fold.predict(X_test)]
+        write_submission(test_d, predicted, 'submission.csv')
+    else:
+        #Run on Holdout set and report the final score on the holdout set
+        predicted = [LABELS[int(a)] for a in best_fold.predict(X_holdout)]
+        actual = [LABELS[int(a)] for a in y_holdout]
 
-    #Run on Holdout set and report the final score on the holdout set
-    predicted = [LABELS[int(a)] for a in best_fold.predict(X_holdout)]
-    actual = [LABELS[int(a)] for a in y_holdout]
-
-    report_score(actual,predicted)
+        report_score(actual,predicted)
