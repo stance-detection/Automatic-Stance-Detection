@@ -417,8 +417,8 @@ class Config():
     def __init__(self):
         #self.mode= "cross_validate" #cross validate on available dataset, all models
         #self.mode= "train"          #training on all data (without holdout)
-        #self.mode= "final_train"    #training on all data available (merging holdout) 
-        self.mode= "test_hold"      #testing on holdout set using saved models
+        self.mode= "final_train"    #training on all data available (merging holdout) 
+        #self.mode= "test_hold"      #testing on holdout set using saved models
         #self.mode= "test"           #testing on final test set
 
 
@@ -440,7 +440,7 @@ if __name__ == "__main__":
     if config.mode == "cross_validate":
 
         features = Features(d, n_folds=10)
-        features.holdoutfeatures(model)
+        features.holdoutfeatures(model, config.mode)
         features.foldsfeatures(model, config.mode)
         fold_stances = features.fold_stances
         folds = features.folds
@@ -560,7 +560,7 @@ if __name__ == "__main__":
             ids=[0]
             if two_stage[cval_ind] == False:
 
-                X_stg1, X_stg2, y_stg1, y_stg2 = features.consolidated_features_cval(cval_ind,fold, ids, config.mode)
+                X_stg1, X_stg2, y_stg1, y_stg2 = features.consolidated_features_cval(cval_ind,fold, ids)
                 X_train_stg1 = X_stg1["train"]
                 X_test_stg1 = X_stg1["test"]
                 X_holdout_stg1 = X_stg1["holdout"]
@@ -591,7 +591,7 @@ if __name__ == "__main__":
                 del best_fold1, best_score
 
             else:
-                X_stg1, X_stg2, y_stg1, y_stg2 = features.consolidated_features_cval(cval_ind,fold, ids, config.mode)
+                X_stg1, X_stg2, y_stg1, y_stg2 = features.consolidated_features_cval(cval_ind,fold, ids)
                 X_train_stg1 = X_stg1["train"]
                 X_test_stg1 = X_stg1["test"]
                 X_holdout_stg1 = X_stg1["holdout"]
@@ -672,6 +672,104 @@ if __name__ == "__main__":
                 final, actual, score = classifier.run_stage2(X_holdout_stg2)
                 report_score(actual,final)
 
-        
+    elif config.mode == "final_train":
+
+        features= Features(d, n_folds=1)
+        features.finalfolds=[]
+        for i in list(range(len(features.fold_stances[0]))):
+            features.finalfolds.append(features.fold_stances[0][i])
+
+        for i in list(range(len(features.hold_out_stances))):
+            features.finalfolds.append(features.hold_out_stances[i])
+
+        features.fold_stances[0]=features.finalfolds
+        features.foldsfeatures(model, config.mode)
+        features.holdoutfeatures(model, config.mode)
+        fold_stances = features.fold_stances
+        folds = features.folds
+        best_score = 0
+        best_fold1= None
+        best_fold2= None
+        del model
+        print('training')
+
+        fscore = []
+        two_stage= [ False, False, True, True, True]       
+        for cval_ind in range(0,5):
+            print(cval[cval_ind])
+                
+            fold=0
+            ids=[0]
+            if two_stage[cval_ind] == False:
+
+                X_stg1, X_stg2, y_stg1, y_stg2 = features.consolidated_features_cval(cval_ind,fold, ids)
+                X_train_stg1 = X_stg1["train"]
+                X_test_stg1 = X_stg1["test"]
+                X_holdout_stg1 = X_stg1["holdout"]
+                y_test_true = y_stg1["true"]
+                y_train_stg1 = y_stg1["train"]
+                y_test_stg1 = y_stg1["test"]
+                y_holdout = y_stg1["holdout"]
+                X_train_stg2 = X_stg2["train"]
+                X_test_stg2 = X_stg2["test"] 
+                X_holdout_stg2 = X_stg2["holdout"] 
+                y_train_stg2 = y_stg2["train"] 
+
+                best_score=0
+                clf = RandomForestClassifier(n_estimators=200, n_jobs=4, verbose=False)
+                clf.fit(X_train_stg1, y_train_stg1)
+                classifier = one_stage_classifier(clf)
+                final, actual, score = classifier.run(X_holdout_stg1, y_holdout)
+                print("Score for fold "+ str(fold) + " was - " + str(score))
+                if score > best_score:
+                    best_score = score
+                    best_fold1 = clf
+                
+                filename = model_dir+ "_" + config.mode + "_" + cval[cval_ind]
+                pickle.dump(best_fold1, open(filename, "wb"))                    
+
+                report_score(actual,final)
+                fscore.append(score)
+                del best_fold1, best_score
+
+            else:
+                X_stg1, X_stg2, y_stg1, y_stg2 = features.consolidated_features_cval(cval_ind,fold, ids)
+                X_train_stg1 = X_stg1["train"]
+                X_test_stg1 = X_stg1["test"]
+                X_holdout_stg1 = X_stg1["holdout"]
+                y_test_true = y_stg1["true"]
+                y_train_stg1 = y_stg1["train"]
+                y_test_stg1 = y_stg1["test"]
+                y_holdout = y_stg1["holdout"]
+                X_train_stg2 = X_stg2["train"]
+                X_test_stg2 = X_stg2["test"] 
+                X_holdout_stg2 = X_stg2["holdout"] 
+                y_train_stg2 = y_stg2["train"] 
+
+                best_score=0
+                clf = RandomForestClassifier(n_estimators = 200, n_jobs= 4, verbose=False)
+                clf.fit(X_train_stg1, y_train_stg1)
+                clf2 = RandomForestClassifier(n_estimators= 200, n_jobs= 4, verbose=False)    
+                clf2.fit(X_train_stg2, y_train_stg2)                
+                classifier = two_stage_classifier(clf, clf2)
+                classifier.run_stage1(X_holdout_stg1, y_holdout)
+                final, actual, score = classifier.run_stage2(X_holdout_stg2)
+                print("Score for fold "+ str(fold) + " was - " + str(score))
+                if score > best_score:
+                    best_score = score
+                    best_fold1 = clf
+                    best_fold2 = clf2
+                            
+                filename1 = model_dir+ "_" + config.mode + "_" + cval[cval_ind] + "stg1"
+                pickle.dump(best_fold1, open(filename1, "wb"))                    
+                filename2 = model_dir+ "_" + config.mode + "_" + cval[cval_ind] + "stg2"
+                pickle.dump(best_fold2, open(filename2, "wb"))
+
+                report_score(actual,final)
+                fscore.append(score)
+                del best_fold1, best_fold2, best_score
+
+        filename = model_dir + config.mode + "_results" 
+        pickle.dump(fscore, open(filename, "wb"))
         
 
