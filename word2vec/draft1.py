@@ -1,6 +1,4 @@
 import sys
-reload(sys)
-sys.setdefaultencoding('utf-8')
 
 import numpy as np
 import nltk
@@ -122,7 +120,7 @@ class Test_Features():
 
     def testfeatures(self, model):
         print('calculating test features')
-        self.Xc_test = generate_test_features(self.test_stances, self.datset, "test",model)
+        self.Xc_test = generate_test_features(self.test_stances, self.dataset, "test",model)
         self.X_baseline_test = generate_baseline_test_features(self.test_stances, self.dataset, "test_submission")
         self.Xtotal_test = np.hstack((self.X_baseline_test, self.Xc_test))
 
@@ -141,7 +139,7 @@ class Test_Features():
 
         elif cval_ind==1:
              
-            X_holdout = self.Xc_holdout
+            X_test = self.Xc_test
             #y_holdout = self.y_holdout
 
             X_stg1 = dict()
@@ -908,7 +906,7 @@ if __name__ == "__main__":
 
     elif config.mode == "test":
         test_d = TestDataSet()
-        features = TestFeatures(test_d)
+        features = Test_Features(test_d)
         features.testfeatures(model) 
         del model
         print('testing')
@@ -937,5 +935,5 @@ if __name__ == "__main__":
                 classifier = test_one_stage_classifier(best)
                 final = classifier.run(X_test_stg1)
                 
-            write_submission(test_d, predicted, cval[cval_ind]+"_submission.csv")
+            write_submission(test_d, final, cval[cval_ind]+"_submission.csv")
             

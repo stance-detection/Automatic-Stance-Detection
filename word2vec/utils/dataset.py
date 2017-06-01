@@ -62,9 +62,10 @@ class TestDataSet():
 
     def read(self,filename):
         rows = []
-        with open(self.path + "/" + filename, "r", encoding='utf-8') as table:
+        with open(self.path + "/" + filename, "r", encoding='latin') as table:
             r = DictReader(table)
 
             for line in r:
+                #print(line)
                 rows.append(line)
         return rows
