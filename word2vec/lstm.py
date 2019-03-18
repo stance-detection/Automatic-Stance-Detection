@@ -8,8 +8,6 @@ from utils.generate_test_splits import kfold_split, get_stances_for_folds
 from utils.score import report_score, LABELS, score_submission
 
 from nltk.tokenize import RegexpTokenizer
-#from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
-#from sklearn.linear_model import LogisticRegression
 
 import gensim
 from gensim.models import word2vec
@@ -36,7 +34,7 @@ def buildWordVector(text, model):
         else:
             v.append(np.zeros((300,)))
             count += 1
-    
+
     return v, count
 
 def to_one_hot(y):
@@ -57,7 +55,7 @@ def from_one_hot(yoh):
 
 
 def generate_features(stances, dataset, name, model, binary=False):
-    headline, body = dict(), dict() 
+    headline, body = dict(), dict()
 
     headline['features'] = []
     headline['lengths'] = []
@@ -76,7 +74,7 @@ def generate_features(stances, dataset, name, model, binary=False):
         headline_features, h_length = buildWordVector(stance['Headline'], model)
         body_features, b_length = buildWordVector(dataset.articles[stance['Body ID']],model)
         headline['features'].append(headline_features)
-        headline['lengths'].append(h_length)        
+        headline['lengths'].append(h_length)
         body['features'].append(body_features)
         body['lengths'].append(b_length)
 
@@ -95,7 +93,7 @@ class LSTM():
         # Network Parameters
         self.input_dims = 300
         self.n_hidden = 100
-        self.n_classes = 4 
+        self.n_classes = 4
 
         # tf Graph input
         self.head = tf.placeholder(dtype = tf.float64, shape=[None, None, self.input_dims])
@@ -104,7 +102,7 @@ class LSTM():
         self.body_lengths = tf.placeholder(dtype=tf.int8,shape=[None,])
         self.labels = tf.placeholder(dtype = tf.float64, shape=[None, self.n_classes])
 
-        
+
         with tf.variable_scope('head', reuse=True):
             self.LSTM_head = tf.contrib.rnn.BasicLSTMCell(self.n_hidden, state_is_tuple=False)
         with tf.variable_scope('body', reuse=True):
@@ -121,7 +119,7 @@ class LSTM():
 
 
 
-       
+
     def calculate(self):
         with tf.variable_scope('head'):
             head_outputs, head_last_states = tf.nn.dynamic_rnn(
@@ -132,7 +130,7 @@ class LSTM():
                                 initial_state = self.initial_state)
 
         head_old_layer = head_last_states
-        
+
         with tf.variable_scope('body'):
             body_outputs, body_last_states = tf.nn.dynamic_rnn(
                                 cell = self.LSTM_body,
@@ -140,13 +138,13 @@ class LSTM():
                                 sequence_length = self.body_lengths,
                                 inputs = self.body,
                                 initial_state = head_old_layer)
-        
+
         body_out_layer = tf.matmul(body_outputs[:,-1,:], self.outweights['out']) + self.biases['out']
         #body_out_layer = OutputProjectionWrapper(self.LSTM_body, self.n_classes)
         predicted = tf.nn.softmax(body_out_layer)
         cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=predicted, labels=lstm.labels))
         optimizer = tf.train.AdamOptimizer(learning_rate=lstm.learning_rate).minimize(cost)
-        
+
         return predicted, cost, optimizer
 
     def test(self, test_batch_size):
@@ -160,7 +158,7 @@ class LSTM():
                                 initial_state = test_init_state)
         with tf.variable_scope('body', reuse=True):
             body_outputs, body_last_states = tf.nn.dynamic_rnn(
-                                cell = self.LSTM_body,  
+                                cell = self.LSTM_body,
                                 dtype = tf.float64,
                                 sequence_length = self.body_lengths,
                                 inputs = self.body,
@@ -170,7 +168,7 @@ class LSTM():
         predicted = tf.nn.softmax(body_out_layer)
 
         return tf.argmax(predicted,axis=1)
-    
+
 
 
 if __name__ == "__main__":
@@ -227,26 +225,26 @@ if __name__ == "__main__":
         X_btest_len = X_b[fold]["lengths"][:50]
         X_btest = X_b[fold]["features"][:50]
         y_test = ys[fold][:50]
-        
+
 
 
         lstm = LSTM()
         predicted, cost, optimizer = lstm.calculate()
-        
+
         init = tf.global_variables_initializer()
-        
+
         with tf.Session() as sess:
             sess.run(init)
             epoch = 0
-            
+
             while (epoch < lstm.epochs):
                 n_step=0
                 start_ind=0
                 while (n_step*lstm.batch_size < len(X_htrain)):
-                
+
                     if (start_ind+lstm.batch_size < len(X_htrain)):
                         Xhtrain_batch = X_htrain[start_ind: start_ind+ lstm.batch_size]
-                        Xhlen_batch = X_hlen[start_ind: start_ind+ lstm.batch_size]     
+                        Xhlen_batch = X_hlen[start_ind: start_ind+ lstm.batch_size]
                         max_hlen = max(Xhlen_batch)
                         y_tr_batch = to_one_hot(y_train[start_ind: start_ind+ lstm.batch_size])
                         y_ts_batch = to_one_hot(y_test)
@@ -256,13 +254,13 @@ if __name__ == "__main__":
                         max_blen = max(Xblen_batch)
                     #else:
                         #Xhtrain_batch = X_htrain[start_ind: ]
-                        #Xhlen_batch = X_hlen[start_ind: ]     
+                        #Xhlen_batch = X_hlen[start_ind: ]
                         #max_hlen = max(Xhlen_batch)
-    
+
                         #Xbtrain_batch = X_btrain[start_ind: ]
                         #Xblen_batch = X_blen[start_ind: ]
                         #max_blen = max(Xblen_batch)
-                    
+
                     max_hlen_test = max(X_htest_len)
                     max_blen_test = max(X_btest_len)
 
@@ -292,7 +290,7 @@ if __name__ == "__main__":
                     classes = lstm.test(lstm.batch_size)
 
                     if (n_step % lstm.display_step)==0:
-                        outputs = sess.run(classes, 
+                        outputs = sess.run(classes,
                                     feed_dict = {lstm.head: XH_test,
                                                 lstm.head_lengths: X_htest_len,
                                                 lstm.body: XB_test,
@@ -306,22 +304,8 @@ if __name__ == "__main__":
                         max_fold_score, _ = score_submission(actual_labels, actual_labels)
                         score = fold_score/max_fold_score
 
-                    print("step is :"+str(n_step) + "cost is :"+str(result["cost"])+"score is :"+str(score))                                       
+                    print("step is :"+str(n_step) + "cost is :"+str(result["cost"])+"score is :"+str(score))
 
                     start_ind += lstm.batch_size
                     n_step += 1
                 epoch += 1
-
-
-
-
-
-
-        
-
-
-
-
-
-
-
