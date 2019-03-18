@@ -13,6 +13,8 @@
 * word2vec
 * Glove word embeddings
 
+Also try to execute this code on the system after installing all things required (here)[https://github.com/Cisco-Talos/fnc-1/tree/master/deep_learning_model]
+
 ## ALgorithms
 
 * Lstm
