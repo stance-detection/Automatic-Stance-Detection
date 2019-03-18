@@ -15,9 +15,10 @@
 
 ## ALgorithms
 
-Lstm
-Autoencoder
+* Lstm
+* Autoencoder
 
 ### Execution
 
-Go to word2vec folder and execute lstm.py file
+Clone this repository and download 'google news vectors negative 300' from **[here](https://s3.amazonaws.com/dl4j-distribution/GoogleNews-vectors-negative300.bin.gz)** and put it inside the word2vec folder.
+Now execute execute lstm.py file
