@@ -119,7 +119,6 @@ class LSTM():
 
 
 
-
     def calculate(self):
         with tf.variable_scope('head'):
             head_outputs, head_last_states = tf.nn.dynamic_rnn(
@@ -169,10 +168,7 @@ class LSTM():
 
         return tf.argmax(predicted,axis=1)
 
-
-
 if __name__ == "__main__":
-
     if sys.version_info.major < 3:
         sys.stderr.write('Please use Python version 3 and above\n')
         sys.exit(1)
@@ -241,7 +237,6 @@ if __name__ == "__main__":
                 n_step=0
                 start_ind=0
                 while (n_step*lstm.batch_size < len(X_htrain)):
-
                     if (start_ind+lstm.batch_size < len(X_htrain)):
                         Xhtrain_batch = X_htrain[start_ind: start_ind+ lstm.batch_size]
                         Xhlen_batch = X_hlen[start_ind: start_ind+ lstm.batch_size]
@@ -252,14 +247,14 @@ if __name__ == "__main__":
                         Xbtrain_batch = X_btrain[start_ind: start_ind+ lstm.batch_size]
                         Xblen_batch = X_blen[start_ind: start_ind+ lstm.batch_size]
                         max_blen = max(Xblen_batch)
-                    #else:
-                        #Xhtrain_batch = X_htrain[start_ind: ]
-                        #Xhlen_batch = X_hlen[start_ind: ]
-                        #max_hlen = max(Xhlen_batch)
+                    else:
+                        Xhtrain_batch = X_htrain[start_ind: ]
+                        Xhlen_batch = X_hlen[start_ind: ]
+                        max_hlen = max(Xhlen_batch)
 
-                        #Xbtrain_batch = X_btrain[start_ind: ]
-                        #Xblen_batch = X_blen[start_ind: ]
-                        #max_blen = max(Xblen_batch)
+                        Xbtrain_batch = X_btrain[start_ind: ]
+                        Xblen_batch = X_blen[start_ind: ]
+                        max_blen = max(Xblen_batch)
 
                     max_hlen_test = max(X_htest_len)
                     max_blen_test = max(X_btest_len)
