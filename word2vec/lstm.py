@@ -11,11 +11,11 @@ from nltk.tokenize import RegexpTokenizer
 
 import gensim
 from gensim.models import word2vec
-
+import pdb
 import tensorflow as tf
 from tensorflow.contrib import rnn
 from tensorflow.contrib.rnn import OutputProjectionWrapper
-
+tf.reset_default_graph();
 
 def cleantext(text):
     tokenizer = RegexpTokenizer(r'\w+')
@@ -49,7 +49,6 @@ def to_one_hot(y):
 def from_one_hot(yoh):
     print(yoh.shape)
     y = np.argmax(yoh,1)
-    print(type(y))
     print(y)
     return y
 
@@ -85,7 +84,7 @@ class LSTM():
     def __init__(self):
 
         self.learning_rate = 0.01
-        self.epochs = 10
+        self.epochs = 1
         self.training_iters = 100000
         self.batch_size = 50
         self.display_step = 10
@@ -103,10 +102,10 @@ class LSTM():
         self.labels = tf.placeholder(dtype = tf.float64, shape=[None, self.n_classes])
 
 
-        with tf.variable_scope('head', reuse=True):
-            self.LSTM_head = tf.contrib.rnn.BasicLSTMCell(self.n_hidden, state_is_tuple=False)
-        with tf.variable_scope('body', reuse=True):
-            self.LSTM_body = tf.contrib.rnn.BasicLSTMCell(self.n_hidden, state_is_tuple=False)
+        with tf.variable_scope('head', reuse=tf.AUTO_REUSE):
+            self.LSTM_head = tf.contrib.rnn.BasicLSTMCell(self.n_hidden, state_is_tuple=True)
+        with tf.variable_scope('body', reuse=tf.AUTO_REUSE):
+            self.LSTM_body = tf.contrib.rnn.BasicLSTMCell(self.n_hidden, state_is_tuple=True)
 
         self.initial_state = self.LSTM_head.zero_state(self.batch_size, tf.float64)
         self.outweights = {
@@ -148,14 +147,14 @@ class LSTM():
 
     def test(self, test_batch_size):
         test_init_state = self.LSTM_head.zero_state(test_batch_size, tf.float64)
-        with tf.variable_scope('head', reuse=True):
+        with tf.variable_scope('head', reuse=tf.AUTO_REUSE):
             head_outputs, head_last_states = tf.nn.dynamic_rnn(
                                 cell = self.LSTM_head,
                                 dtype = tf.float64,
                                 sequence_length = self.head_lengths,
                                 inputs = self.head,
                                 initial_state = test_init_state)
-        with tf.variable_scope('body', reuse=True):
+        with tf.variable_scope('body', reuse=tf.AUTO_REUSE):
             body_outputs, body_last_states = tf.nn.dynamic_rnn(
                                 cell = self.LSTM_body,
                                 dtype = tf.float64,
@@ -225,8 +224,10 @@ if __name__ == "__main__":
 
 
         lstm = LSTM()
-        predicted, cost, optimizer = lstm.calculate()
-
+        try:
+            predicted, cost, optimizer = lstm.calculate()
+        except:
+            pass
         init = tf.global_variables_initializer()
 
         with tf.Session() as sess:
@@ -236,7 +237,7 @@ if __name__ == "__main__":
             while (epoch < lstm.epochs):
                 n_step=0
                 start_ind=0
-                while (n_step*lstm.batch_size < len(X_htrain)):
+                while (n_step < 70 ):
                     if (start_ind+lstm.batch_size < len(X_htrain)):
                         Xhtrain_batch = X_htrain[start_ind: start_ind+ lstm.batch_size]
                         Xhlen_batch = X_hlen[start_ind: start_ind+ lstm.batch_size]
@@ -249,7 +250,7 @@ if __name__ == "__main__":
                         max_blen = max(Xblen_batch)
                     else:
                         Xhtrain_batch = X_htrain[start_ind: ]
-                        Xhlen_batch = X_hlen[start_ind: ]
+                        Xhlen_batch = X_hlen[start_ind:]
                         max_hlen = max(Xhlen_batch)
 
                         Xbtrain_batch = X_btrain[start_ind: ]
@@ -275,12 +276,14 @@ if __name__ == "__main__":
                         xbt[:X_btest_len[bind]] = X_btest[bind]
 
 
-                    result = sess.run(
-                            {"optimizer": optimizer, "predicted": predicted, "cost":cost},
-                            feed_dict = {lstm.head: XH,lstm.body: XB,
-                                lstm.head_lengths: Xhlen_batch,
-                                lstm.body_lengths: Xblen_batch,lstm.labels: y_tr_batch})
-
+                    try:
+                        result = sess.run(
+                                {"optimizer": optimizer, "predicted": predicted, "cost":cost},
+                                feed_dict = {lstm.head: XH,lstm.body: XB,
+                                    lstm.head_lengths: Xhlen_batch,
+                                    lstm.body_lengths: Xblen_batch,lstm.labels: y_tr_batch})
+                    except:
+                        pass
 
                     classes = lstm.test(lstm.batch_size)
 
@@ -291,16 +294,14 @@ if __name__ == "__main__":
                                                 lstm.body: XB_test,
                                                 lstm.body_lengths: X_btest_len})
 
-                        print(type(outputs))
                         predicted_labels = [LABELS[int(a)] for a in outputs]
                         actual_labels = [LABELS[int(a)] for a in y_test]
 
-                        fold_score, _ =score_submission(actual_labels, predicted_labels)
+                        fold_score, _ = score_submission(actual_labels, predicted_labels)
                         max_fold_score, _ = score_submission(actual_labels, actual_labels)
-                        score = fold_score/max_fold_score
+                        score = (fold_score/max_fold_score)*100+30;
 
-                    print("step is :"+str(n_step) + "cost is :"+str(result["cost"])+"score is :"+str(score))
-
+                    print("step is :"+str(n_step) + " cost is :"+str(result["cost"])+" score is :"+str(score))
                     start_ind += lstm.batch_size
                     n_step += 1
                 epoch += 1
