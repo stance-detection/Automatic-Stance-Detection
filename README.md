@@ -29,7 +29,7 @@
 
 The result obtained is as
 
-[lstm_result.png](images/lstm_result.png)
+![](images/lstm_result.png)
 
 
 
