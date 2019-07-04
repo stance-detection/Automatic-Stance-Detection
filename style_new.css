@@ -1,0 +1,14 @@
+.box-orange{
+background:orange;
+position:relative;
+top:100px;
+left:100px;
+height:100px;
+width:100px;
+}
+.box-blue{
+background:lightskyblue;
+height:100px;
+width:100px;
+position:static;
+}
