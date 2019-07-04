@@ -1,0 +1,18 @@
+@media screen and (min-width:480px) and (max-width:720px){
+	body{
+		background-color:lightgreen;
+	}
+}
+.city{
+	font-family:Helvetica;
+	font-size:72;
+	color:green;
+}
+#cityNames{
+	color:blue;
+}
+#locationSubject{{
+	color:#558bff;
+	border:5px solid #000;
+}
+	

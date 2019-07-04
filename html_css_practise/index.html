@@ -1,0 +1,87 @@
+<html>
+<head>
+<!--
+<link rel="stylesheet" type="text/css" src="htmlcss_practise/style.css">
+-->
+<style type="text/css">
+@media screen and (min-width:480px) and (max-width:720px){
+	body{
+		background-color:lightgreen;
+	}
+}
+.city{
+	font-family:Helvetica;
+	color:green;
+	list-style-type:circle;
+}
+#cityNames{
+	color:blue;
+	list-style-type:disc;
+}
+#locationSubject{
+	color:black;
+	border=5px;
+}
+</style>
+<meta http-equiv="refresh" content="30">
+<title>Assignment</title>
+</head>
+
+<body>
+<h1>About</h1>
+<p> It can be intimidating for women to learn and ask questions when they are in <b>extreme minority</b>.While open and welcoming,today's budding developer community is upto <b>91% male</b>.If we can empower more females with the confidence in their technological capabilities <i>we can begin to change this landscape</i>.
+
+<h2> Our Locations </h2>
+		<ul id="cityNames">USA
+			<ul>
+			<li class="city">New York</li>
+			<li class="city">Columbus</li>
+			<li  class="city">Austin</li>
+			<li  class="city">Philly</li>
+			</ul>
+			World<ul>
+			<li class="city">Ottawa</li>
+			<li class="city">Sydney</li>
+			</ul>
+		</ul>
+		<p><h2>Upcoming Classes</h2></p>
+		<table id="locationSubject" border="1px solid">
+			<tr>
+				<th>:Location</th>
+				<th>Topic</th>
+			</tr>
+			<tr>
+				<td>New York</td>
+				<td>JavaScript and JQuery</td>
+			</tr>
+			<tr>
+				<td>San Francisco</td>
+				<td>HTML and CSS</td>
+			</tr>
+		</table>
+		<h2>Sign Up</h2>
+		<body>
+		<p>Basic form</p>
+		<form action="" method="">
+		<div><label>First Name:</label><input type="text" name="fname" value=""/></div>
+		<div><label>Email: </label><input type="text" name="email" value=""/></div>
+		
+		<label>Locations:</label>
+			<select name="city" style="color:blue">
+				<option value="delhi">New Delhi</option>
+				<option value="beng">Bengaluru</option>
+				<option value="bbs">Bhubaneshwar</option>
+				<option value="vrns">Varanasi</option>
+				<option value="kpr">Kanpur</option>
+				<option value="bmb">Mumbai</option>
+			</select>
+		<div><label>Gender: </label>Male:<input type="radio" name="Gender" checked value="Male"/>
+					 Female:<input type="radio" name="Gender"  value="Female"/></div>
+		<div><label> Remember Me: </label>
+		<input type="checkbox" name="remember" value="yes"/></div>
+		<label> Experience: </label><textarea height ="100px" width="100px"></textarea>
+		<div><input type="submit" name="submit" value="submit"/></div>
+		</form>
+		
+</body>
+</html>
